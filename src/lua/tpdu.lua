@@ -45,24 +45,6 @@ function Iter:read_str(n)
   return str
 end
 
-function Iter:align()
-  if math.mod(self._i) == 0 then
-    self._i = self._i + 1
-  end
-  return self
-end
-
-function Iter:write_char(ch)
-  self._s = self._s .. ch
-  return self
-end
-
-function Iter:write_byte(b)
-  return self:write_char(
-    string.format('%.2X', b)
-  )
-end
-
 end
 
 local TON = { -- TYPEOFNUMBER

@@ -1,0 +1,16 @@
+PROJECT = 'tpdu'
+
+INITLAKEFILE()
+
+install = target('install', {
+  file.group{odir=LIBDIR;              src = J("src", "lua") ; recurse = true };
+  file.group{odir=TESTDIR;             src = 'test';           recurse = true };
+})
+
+target('test', install, function()
+  run_test(nil, 'test.lua')
+
+  if not test_summary() then
+    quit("test fail")
+  end
+end)

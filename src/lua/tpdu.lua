@@ -496,6 +496,67 @@ local function VPEncode(v, pdu)
   error('Reserved format')
 end
 
+local IE_Decode = {
+  [0] = function(iter)
+    local len = iter:read_byte()
+    assert(len == 3)
+    local ref = iter:read_byte()
+    local cnt = iter:read_byte()
+    local no  = iter:read_byte()
+    return { iei = 0, cnt = cnt, ref = ref, no = no }
+  end;
+
+  [8] = function(iter)
+    local len = iter:read_byte()
+    assert(len == 4)
+    local ref1 = iter:read_byte()
+    local ref2 = iter:read_byte()
+    local cnt = iter:read_byte()
+    local no  = iter:read_byte()
+    return { iei = 8, cnt = cnt, ref = bit.lshift(ref1,8) + ref2, no = no}
+  end;
+}
+
+local function UDHDecode(data)
+  local iter = Iter.new(data)
+  local res = {}
+  while true do
+    local iei  = iter:read_byte()
+    if not iei then break end
+    local decode = IE_Decode[iei]
+    if decode then
+      res[#res + 1] = decode(iter)
+    else
+      local iedl = iter:read_byte()
+      res[#res + 1] = {
+        iei = iei;
+        ied = iter:read_str(iedl)
+      }
+    end
+  end
+  return res
+end
+
+local function UDHEncode(udh, dcs)
+  local iter = Iter.new(data)
+  local res = {}
+  while true do
+    local iei  = iter:read_byte()
+    if not iei then break end
+    local decode = IE_Decode[iei]
+    if decode then
+      res[#res + 1] = decode(iter)
+    else
+      local iedl = iter:read_byte()
+      res[#res + 1] = {
+        iei = iei;
+        ied = iter:read_str(iedl)
+      }
+    end
+  end
+  return res
+end
+
 local function UDDecode(iter, pdu, dcs)
   local len = iter:read_byte()
   local udh, udhl
@@ -503,6 +564,7 @@ local function UDDecode(iter, pdu, dcs)
   if pdu.udhi then
     udhl = iter:read_byte()
     udh  = iter:read_char(udhl * 2)
+    udh  = UDHDecode(udh)
   end
 
   local data
@@ -516,6 +578,7 @@ local function UDDecode(iter, pdu, dcs)
     data = iter:read_char(len * 2)
     data = hex2bin(data)
   end
+
   return data, udh
 end
 

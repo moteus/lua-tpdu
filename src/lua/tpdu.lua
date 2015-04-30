@@ -109,6 +109,101 @@ local function find(t, val)
   end
 end
 
+local STInfo do
+
+local ST_SUCCESS = { -- Short message transaction completed
+  [0] = 'Short message received by the SME',
+  [1] = 'Short message forwarded by the SC to the SME but the SC is unable to confirm delivery',
+  [2] = 'Short message replaced by the SC',
+}
+
+local ST_RESERVED = { -- Reserved values
+  [{03, 15}] = 'Reserved',
+  [{16, 31}] = 'Values specific to each SC',
+}
+
+local ST_TEMP_FAIL = { -- Temporary error, SC still trying to transfer SM
+  [32]     = 'Congestion',
+  [33]     = 'SME busy',
+  [34]     = 'No response from SME',
+  [35]     = 'Service rejected',
+  [36]     = 'Quality of service not available',
+  [37]     = 'Error in SME',
+  [{38, 47}] = 'Reserved',
+  [{48, 63}] = 'Values specific to each SC',
+}
+
+local ST_FAIL = { -- Permanent error, SC is not making any more transfer attempts
+  [64]       = 'Remote procedure error',
+  [65]       = 'Incompatible destination',
+  [66]       = 'Connection rejected by SME',
+  [67]       = 'Not obtainable',
+  [68]       = 'Quality of service not available',
+  [69]       = 'No interworking available',
+  [70]       = 'SM Validity Period Expired',
+  [71]       = 'SM Deleted by originating SME',
+  [72]       = 'SM Deleted by SC Administration',
+  [73]       = 'SM does not exist (The SM may have previously existed in the SC but the SC no longer has knowledge of it or the SM may never have previously existed in the SC)',
+  [{74, 79}] = 'Reserved',
+  [{80, 95}] = 'Values specific to each SC',
+}
+
+local ST_RECOVERED_FAIL = { -- Temporary error, SC is not making any more transfer attempts
+  [96 ]        = 'Congestion',
+  [97 ]        = 'SME busy',
+  [98 ]        = 'No response from SME',
+  [99 ]        = 'Service rejected',
+  [100]        = 'Quality of service not available',
+  [101]        = 'Error in SME',
+  [{102, 105}] = 'Reserved',
+  [{106, 111}] = 'Reserved',
+  [{112, 127}] = 'Values specific to each SC',
+}
+
+local function find_status(t, s)
+  if t[s] then return t[s] end
+  for k, v in pairs(t) do
+    if type(k) == 'table' then
+      if k[1] <= s and k[2] >= s then
+        return v
+      end
+    end
+  end
+end
+
+STInfo = function(status)
+  local res = {
+    status    = status,
+    success   = false,
+    temporary = false,
+    recovered = false,
+  }
+
+  res.info = find_status(ST_SUCCESS, status)
+  if res.info then
+    res.success = true
+    return res
+  end
+
+  res.info = find_status(ST_TEMP_FAIL, status)
+  if res.info then
+    res.temporary = true
+    return res
+  end
+
+  res.info = find_status(ST_RECOVERED_FAIL, status)
+  if res.info then
+    res.recovered = true
+    return res
+  end
+
+  res.info = find_status(ST_FAIL, status) or find_status(ST_RESERVED, status)
+
+  return res
+end
+
+end
+
 local function SCADecode(iter)
   local len  = iter:read_byte()
   if len == 0 then return {} end
@@ -602,6 +697,9 @@ end
 --
 -- STATUS
 -- SCA PDU-Type MR DA SCTS DTS TPS
+--
+-- STATUS-REPORT
+-- SCA PDU-Type MR DA SCTS DTS TPS
 
 local function PDUDecoder(pdu, direct)
   local iter = Iter.new(pdu)
@@ -638,6 +736,7 @@ local function PDUDecoder(pdu, direct)
   local status
   if tp.mti == 'STATUS' then
     status = iter:read_byte()
+    status = STInfo(status)
   end
 
   local vp
@@ -677,6 +776,7 @@ local function PDUEncoder(msg)
   local mti = tp.mti or 'SUBMIT'
 
   res[#res + 1] = SCAEncode(sc)
+  local sc_len  = #res[#res]
 
   res[#res + 1] = PDUTypeEncode(tp)
 
@@ -707,14 +807,20 @@ local function PDUEncoder(msg)
   end
 
   if mti == 'STATUS' then
-    res[#res + 1] = string.format("%.2X", msg.status or 0)
+    local status = msg.status
+    if type(status) == 'table' then
+      status = status.status
+    end
+    res[#res + 1] = string.format("%.2X", status or 0)
   end
 
   if mti == 'SUBMIT' or mti == 'DELIVER' then
     res[#res + 1] = UDEncode(msg.ud, msg.dcs)
   end
 
-  return table.concat(res)
+  local pdu = table.concat(res)
+  local len = #pdu - sc_len
+  return pdu, math.floor(len/2 + 0.5)
 end
 
 return {

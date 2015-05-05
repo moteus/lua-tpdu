@@ -4,7 +4,7 @@ pcall(require, "luacov")
 
 local tpdu           = require "tpdu"
 local Bit7           = require "tpdu.bit7"
-local Bcd             = require "tpdu.bcd"
+local Bcd            = require "tpdu.bcd"
 local ut             = require "tpdu.utils"
 
 local utils          = require "utils"
@@ -102,5 +102,49 @@ end)
 
 end
 
+local _ENV = TEST_CASE'Timestamp tests' if ENABLE then
+
+local it = IT(_ENV or _M)
+
+local tests = {
+  {'9001425100704A', {
+    year=09, month=10, day=24,
+    hour=15, min  =00, sec=07,
+    tz=-6,
+  }},
+  {'21204141336202', {
+    year=12, month=02, day=14,
+    hour=14, min  =33, sec=26,
+    tz=5,
+  }},
+  {'11119190046422', {
+    year=11, month=11, day=19,
+    hour=09, min  =40, sec=46,
+    tz=5.5,
+  }},
+}
+
+for i, t in ipairs(tests) do
+  it(("test decode #%d"):format(i), function()
+    local iter = tpdu._Iter.new(t[1])
+    local et = t[2]
+    local ts = assert_table(tpdu._TSDecode(iter))
+    assert_equal(et.year  , ts.year  )
+    assert_equal(et.month , ts.month )
+    assert_equal(et.day   , ts.day   )
+    assert_equal(et.hour  , ts.hour  )
+    assert_equal(et.min   , ts.min   )
+    assert_equal(et.sec   , ts.sec   )
+    assert_equal(et.tz    , ts.tz    )
+  end)
+
+  it(("test encode #%d"):format(i), function()
+    local et = tpdu._TSEncode(t[2])
+    assert(t[1] == et)
+  end)
+
+end
+
+end
 
 RUN()

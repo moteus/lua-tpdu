@@ -36,15 +36,6 @@ function Iter:read_byte()
   return tonumber(self:read_char(2), 16)
 end
 
-function Iter:read_str(n)
-  local str = self:read_char(n*2)
-  str = str:gsub("(..)", function(ch)
-    local a = tonumber(ch, 16)
-    return string.char(a)
-  end)
-  return str
-end
-
 end
 
 local TON = { -- TYPEOFNUMBER
@@ -532,6 +523,12 @@ local function TSDecode(iter)
   local s  = BcdDecode(iter:read_char(2))
   local tz = BcdDecode(iter:read_char(2))
 
+  tz = tonumber(tz, 16)
+  local sign_tz = bit.band(tz, 0x80) == 0
+  tz = tonumber(string.format('%.2X', bit.band(tz, 0x7F)))
+  tz = tz / 4
+  if not sign_tz then tz = -tz end
+
   return {
     year  = tonumber(Y);
     month = tonumber(M);
@@ -539,15 +536,24 @@ local function TSDecode(iter)
     hour  = tonumber(h);
     min   = tonumber(m);
     sec   = tonumber(s);
-    tz    = tonumber(tz);
+    tz    = tz;
   }
 end
 
 local function TSEncode(ts)
+  local tz = math.floor(math.abs(ts.tz) * 4)
+  tz = string.format("%.2d", tz)
+
+  if ts.tz < 0 then
+    tz = tonumber(tz, 16)
+    tz = bit.bor(tz, 0x80)
+    tz = string.format("%.2X", tz)
+  end
+
   return BcdEncode(
-    string.format("%.2d%.2d%.2d%.2d%.2d%.2d%.2d",
+    string.format("%.2d%.2d%.2d%.2d%.2d%.2d%s",
       ts.year, ts.month, ts.day,
-      ts.hour, ts.min, ts.sec, ts.tz
+      ts.hour, ts.min, ts.sec, tz
     )
   )
 end
@@ -854,4 +860,8 @@ end
 return {
   Encode = PDUEncoder;
   Decode = PDUDecoder;
+
+  _Iter     = Iter;
+  _TSDecode = TSDecode;
+  _TSEncode = TSEncode;
 }

@@ -69,7 +69,7 @@ local NPI = { -- NUMBERINGPLANIDENTIFICATION
   RESERVED   = 15
 }
 
-local MTI = {-- message type id 
+local MTI = { -- message type id 
   DELIVER            = 0;
   SUBMIT             = 1;
   COMMAND            = 2;
@@ -278,24 +278,13 @@ local function PDUTypeDecode(iter, direct)
   local v = iter:read_byte()
 
   local tp = {
-    rp   = GetBits(v, 7)    ~= 0;
-    udhi = GetBits(v, 6)    ~= 0;
-    srr  = GetBits(v, 5)    ~= 0;
-    vpf  = GetBits(v, 3, 2);
-    rd   = GetBits(v, 2)    ~= 0;
-    mti  = GetBits(v, 0, 2);
+    mti = GetBits(v, 0, 2);
   }
 
-  if tp.mti == MTI.DELIVER then
-    tp.sri, tp.srr = tp.srr
-    tp.vpf = nil
-    tp.mms, tp.rd  = tp.rd
-  end
-
   if direct == 'input' then -- from smsc
-        if tp.mti == MTI.DELIVER          then tp.mti = 'DELIVER'
-    elseif tp.mti == MTI['SUBMIT-REPORT'] then tp.mti = 'SUBMIT-REPORT'
-    elseif tp.mti == MTI.STATUS           then tp.mti = 'STATUS'
+        if tp.mti == MTI.DELIVER           then tp.mti = 'DELIVER'
+    elseif tp.mti == MTI['SUBMIT-REPORT']  then tp.mti = 'SUBMIT-REPORT'
+    elseif tp.mti == MTI.STATUS            then tp.mti = 'STATUS'
     else tp.mti = 'ANY' end
   else
         if tp.mti == MTI.SUBMIT            then tp.mti = 'SUBMIT'
@@ -304,26 +293,55 @@ local function PDUTypeDecode(iter, direct)
     else tp.mti = 'ANY' end
   end
 
+  if tp.mti == 'SUBMIT' then
+    tp.rd   = GetBits(v, 2)    ~= 0;
+    tp.vpf  = GetBits(v, 3, 2);
+    tp.srr  = GetBits(v, 5)    ~= 0;
+    tp.udhi = GetBits(v, 6)    ~= 0;
+    tp.rp   = GetBits(v, 7)    ~= 0;
+  end
+
+  if tp.mti == 'DELIVER' then
+    tp.mms  = GetBits(v, 2)    ~= 0;
+    tp.sri  = GetBits(v, 5)    ~= 0;
+    tp.udhi = GetBits(v, 6)    ~= 0;
+    tp.rp   = GetBits(v, 7)    ~= 0;
+  end
+
+  if tp.mti == 'STATUS' then
+    tp.mms  = GetBits(v, 2)    ~= 0;
+    tp.srq  = GetBits(v, 5)    ~= 0;
+  end
+
   return tp
 end
 
 local function PDUTypeEncode(tp)
   local v = 0
 
-  local mti, _ = tp.mti or MTI.SUBMIT
-  _, mti = find(MTI, mti)
+  local mti = tp.mti or 'SUBMIT'
+  local _, m = find(MTI, mti)
 
-  v = SetBits(v, 7, tp.rp,   0)
-  v = SetBits(v, 6, tp.udhi, 0)
-  v = SetBits(v, 0, mti,     1)
+  v = SetBits(v, 0, m)
 
-  if mti == MTI.DELIVER then
-    v = SetBits(v, 5, tp.sri,  0)
-    v = SetBits(v, 2, tp.mms,  0)
-  else
-    v = SetBits(v, 5, tp.srr,  0)
-    v = SetBits(v, 3, tp.vpf,  0)
+  if mti == 'SUBMIT' then
     v = SetBits(v, 2, tp.rd,   0)
+    v = SetBits(v, 3, tp.vpf,  0)
+    v = SetBits(v, 5, tp.srr,  0)
+    v = SetBits(v, 6, tp.udhi, 0)
+    v = SetBits(v, 7, tp.rp,   0)
+  end
+
+  if tp.mti == 'DELIVER' then
+    v = SetBits(v, 2, tp.mms,  0)
+    v = SetBits(v, 5, tp.sri,  0)
+    v = SetBits(v, 6, tp.udhi, 0)
+    v = SetBits(v, 7, tp.rp,   0)
+  end
+
+  if tp.mti == 'STATUS' then
+    v = SetBits(v, 2, tp.mms,  0)
+    v = SetBits(v, 5, tp.srq,  0)
   end
 
   return string.format('%.2X', v)
@@ -690,16 +708,26 @@ end
 
 ---
 -- SUBMIT
--- SCA PDU-Type MR DA PID DCS VP UDL UD
+-- SCA PDU-Type(MTI,RD,VPF,SRR,UDHI,RP) MR DA PID DCS VP UDL UD
 --
 -- DELIVER
--- SCA PDU-Type OA PID DCS SCTS UDL UD
+-- SCA PDU-Type(MTI,MMS,SRI,UDHI,RP) OA PID DCS SCTS UDL UD
 --
 -- STATUS
--- SCA PDU-Type MR DA SCTS DTS TPS
+-- SCA PDU-Type(MTI,MMS,SRQ) MR DA SCTS DTS TPS
 --
--- STATUS-REPORT
--- SCA PDU-Type MR DA SCTS DTS TPS
+-- DELIVER-REPORT (ERROR)
+-- SCA PDU-Type(MTI) FCS
+--
+-- DELIVER-REPORT (ACK)
+-- SCA PDU-Type(MTI) PI PID DCS UDL UD
+--
+-- SUBMIT-REPORT (ERROR)
+-- SCA PDU-Type(MTI) FCS
+--
+-- SUBMIT-REPORT (ACK)
+-- SCA PDU-Type(MTI) PI SCTS PID DCS UDL UD
+--
 
 local function PDUDecoder(pdu, direct)
   local iter = Iter.new(pdu)

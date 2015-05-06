@@ -307,17 +307,24 @@ local function PDUTypeDecode(iter, direct)
   return tp
 end
 
-local function PDUTypeEncode(tp)
+local function PDUTypeEncode(tp, pdu)
   local v = 0
 
   local mti = tp.mti or 'SUBMIT'
   local _, m = find(MTI, mti)
 
+  local vpf = tp.vpf
+  if not vpf then
+    if pdu.vp then
+      vpf = (type(pdu.vp) == 'number') and 2 or 3
+    end
+  end
+
   v = SetBits(v, 0, m)
 
   if mti == 'SUBMIT' then
     v = SetBits(v, 2, tp.rd,   0)
-    v = SetBits(v, 3, tp.vpf,  0)
+    v = SetBits(v, 3, vpf,     0)
     v = SetBits(v, 5, tp.srr,  0)
     v = SetBits(v, 6, tp.udhi, 0)
     v = SetBits(v, 7, tp.rp,   0)
@@ -587,11 +594,9 @@ local function VPDecode(iter, pdu)
 end
 
 local function VPEncode(v, pdu)
-  if not pdu.vpf or pdu.vpf == 0 then
-    return ''
-  end
+  if not v then return '' end
 
-  if pdu.vpf == 2 then -- relevant
+  if type(v) == 'number' then -- relevant (pdu.vpf == 2)
     if v <= (12*60) then
       v = math.ceil(v / 5) - 1
     else
@@ -608,11 +613,8 @@ local function VPEncode(v, pdu)
     return string.format("%.2X", v)
   end
 
-  if pdu.vpf == 3 then -- absolute
-    return TSEncode(v)
-  end
-
-  error('Reserved format')
+  -- absolute (pdu.vpf == 3)
+  return TSEncode(v)
 end
 
 local IE_Decode = {
@@ -812,7 +814,7 @@ local function PDUEncoder(msg)
   res[#res + 1] = SCAEncode(sc)
   local sc_len  = #res[#res]
 
-  res[#res + 1] = PDUTypeEncode(tp)
+  res[#res + 1] = PDUTypeEncode(tp, msg)
 
   if mti == 'SUBMIT' or mti == 'STATUS' then
     res[#res + 1] = string.format("%.2X", msg.mr or 0)

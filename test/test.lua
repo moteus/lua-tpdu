@@ -171,4 +171,23 @@ end
 
 end
 
+local _ENV = TEST_CASE'Long SMS' if ENABLE then
+
+local it = IT(_ENV or _M)
+
+it('should decode 7bit with align', function()
+  local str = '0041000691214365000012050003CC0201906536FB0DBABFE56C32'
+  local pdu = assert_table(tpdu.Decode(str))
+  assert_equal('Hello world', pdu.ud)
+  assert_true(pdu.tp.udhi)
+  assert_table(pdu.udh)
+  local ie = assert_table(pdu.udh[1])
+  assert_equal(0x00, ie.iei)
+  assert_equal(0x02, ie.cnt)
+  assert_equal(0x01, ie.no)
+  assert_equal(0xCC, ie.ref)
+end)
+
+end
+
 RUN()

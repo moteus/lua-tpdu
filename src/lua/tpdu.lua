@@ -690,10 +690,13 @@ local function UDDecode(iter, pdu, dcs)
 
   local data
   if (not dcs) or (not dcs.codec) or (dcs.codec == 'BIT7') then
-    local bytes = math.ceil(len * 7 / 8)
-    if udhl then bytes = bytes - udhl end
+    local bytes, align = math.ceil(len * 7 / 8)
+    if udhl then
+      bytes = bytes - udhl
+      align = 7 - (udhl + 1) % 7
+    end
     data = iter:read_char(bytes * 2)
-    data = Gsm7Decode(hex2bin(data))
+    data = Gsm7Decode(hex2bin(data), align)
   else
     if udhl then len = len - udhl end
     data = iter:read_char(len * 2)

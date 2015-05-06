@@ -30,7 +30,7 @@ local EncodeTest = {
 
 for i, data in ipairs(EncodeTest) do
   it("Test #" .. tostring(i), function()
-    local enc = assert_string(Bit7.GsmEncode(data[1]))
+    local enc = assert_string(Bit7.GsmEncode(data[1], true))
     local dec = assert_string(Bit7.GsmDecode(ut.hex2bin(data[3])))
     enc = ut.bin2hex(enc)
 
@@ -38,6 +38,30 @@ for i, data in ipairs(EncodeTest) do
     assert_equal(data[3], enc)
   end)
 end
+
+it("Test encode align #1", function()
+  local msg = 'Hello world'
+  local enc = '906536FB0DBABFE56C32'
+  assert_equal(enc, ut.bin2hex(Bit7.GsmEncode(msg, nil, 1)))
+end)
+
+it("Test decode align #1", function()
+  local msg = 'Hello world'
+  local enc = '906536FB0DBABFE56C32'
+  assert_equal(msg, Bit7.GsmDecode(ut.hex2bin(enc), 1))
+end)
+
+it("Test encode align #1 with padding", function()
+  local msg = 'Hello wo'
+  local enc = '906536FB0DBABF1B'
+  assert_equal(enc, ut.bin2hex(Bit7.GsmEncode(msg, true, 1)))
+end)
+
+it("Test encode align #1 without padding", function()
+  local msg = 'Hello wo'
+  local enc = '906536FB0DBABF01'
+  assert_equal(enc, ut.bin2hex(Bit7.GsmEncode(msg, false, 1)))
+end)
 
 end
 

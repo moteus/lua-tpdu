@@ -51,28 +51,43 @@ local function Gsm2Asci(str)
   )
 end
 
-local function Bit7Encode(str, pad)
+local function Bit7Encode(str, pad, align)
   local len = #str
 
-  -- escape padding byte
-  if math.mod(#str, 16) == 0 and str:find('\r$') then
-    str = str .. '\r'
+  if align then
+    align = align % 7
+    if align == 0 then
+      align = nil
+    end
+  end
+
+  if pad then
+    -- escape padding byte
+    if math.mod(#str, 16) == 0 and str:find('\r$') then
+      str = str .. '\r'
+    end
   end
 
   local bytes, res  = {str:byte(1, #str)}, {}
 
+  if pad then
+    if not align then
+      if #bytes % 7 == 1 then
+        bytes[#bytes + 1] = 13
+      end
+    elseif #bytes % 8 == 0 then
+      bytes[#bytes + 1] = 13
+    end
+  end
+
   local i = 1
-  while i <= #str do
+  while i <= #bytes do
     local a, b = bytes[i], bytes[i+1]
 
     local bits  = i % 8
     local rshift = bits - 1
     local lshift = 8 - bits
     assert(bits ~= 0)
-
-    if not b and bits == 7 then
-      b = b or pad or 13 -- padding
-    end
 
     if b then
       v = bit.band(b, mask[bits])
@@ -82,15 +97,47 @@ local function Bit7Encode(str, pad)
     a = bit.rshift(a, rshift)
     v = bit.bor(v, a)
 
-    res[#res + 1] = string.char(v)
+    res[#res + 1] = v
     if bits == 7 then i = i + 2
     else i = i + 1 end
   end
+
+  if align then
+    local filler = 0
+    local m = mask[7 - align]
+    for i = 1, #res do
+      local next_filler = bit.rshift(res[i], 8 - align)
+      res[i] = bit.lshift(res[i], align)
+      res[i] = bit.bor(res[i], filler)
+      res[i] = bit.band(res[i], 0xFF)
+      filler = next_filler
+    end
+    if #res % 7 == 0 then
+      assert(not pad)
+      res[#res + 1] = filler
+    end
+  end
+
+  for i = 1, #res do res[i] = string.char(res[i]) end
+
   return table.concat(res), len
 end
 
-local function Bit7Decode(str)
+local function Bit7Decode(str, align)
   local bytes = {str:byte(1, #str)}
+
+  if align then
+    align = align % 7
+    if align > 0 then
+      local m = mask[7 - align]
+      for i = 1, #bytes do
+        local filler = bit.lshift(bytes[i+1] or 0, 8 - align)
+        bytes[i] = bit.rshift(bytes[i], align)
+        bytes[i] = bit.bor(bytes[i], filler)
+        bytes[i] = bit.band(bytes[i], 0xFF)
+      end
+    end
+  end
 
   local i = 0
   local res = {}
@@ -124,13 +171,13 @@ local function Bit7Decode(str)
   return table.concat(res)
 end
 
-local function Gsm7Encode(str, pad)
+local function Gsm7Encode(str, ...)
   str = Asci2Gsm(str)
-  return Bit7Encode(str, pad)
+  return Bit7Encode(str, ...)
 end
 
-local function Gsm7Decode(str)
-  str = Bit7Decode(str)
+local function Gsm7Decode(str, ...)
+  str = Bit7Decode(str, ...)
   return Gsm2Asci(str)
 end
 

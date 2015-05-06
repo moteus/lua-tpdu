@@ -124,6 +124,12 @@ it('SMS-SUBMIT UCS2', function()
   assert_equal(pdu, tpdu.Encode(ms))
 end)
 
+it('SMS-SUBMIT 7bit udh', function()
+  local pdu = '0041000691214365000012050003CC0201906536FB0DBABFE56C32'
+  local ms = tpdu.Decode(pdu)
+  assert_equal(pdu, tpdu.Encode(ms))
+end)
+
 end
 
 local _ENV = TEST_CASE'Timestamp tests' if ENABLE then

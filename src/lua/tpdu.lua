@@ -638,6 +638,14 @@ local IE_Decode = {
   end;
 }
 
+local IE_Encode = {
+  [0] = function(t)
+    return string.format("%.2X%.2X%.2X%.2X%.2X",
+      0x00, 0x03, t.ref, t.cnt, t.no
+    )
+  end;
+}
+
 local function UDHDecode(data)
   local iter = Iter.new(data)
   local res = {}
@@ -658,24 +666,17 @@ local function UDHDecode(data)
   return res
 end
 
-local function UDHEncode(udh, dcs)
-  local iter = Iter.new(data)
-  local res = {}
-  while true do
-    local iei  = iter:read_byte()
-    if not iei then break end
-    local decode = IE_Decode[iei]
-    if decode then
-      res[#res + 1] = decode(iter)
-    else
-      local iedl = iter:read_byte()
-      res[#res + 1] = {
-        iei = iei;
-        ied = iter:read_str(iedl)
-      }
-    end
+local function UDHEncode(udh)
+  local r = ''
+
+  for _, t in ipairs(udh) do
+    local enc = IE_Encode[t.iei]
+    if enc then r = r .. enc(t) end
   end
-  return res
+
+  return string.format("%.2X%s",
+    bit.rshift(#r, 1), r
+  )
 end
 
 local function UDDecode(iter, pdu, dcs)
@@ -706,15 +707,25 @@ local function UDDecode(iter, pdu, dcs)
   return data, udh
 end
 
-local function UDEncode(msg, dcs)
-  local len, data
-  if (not dcs) or (not dcs.codec) or (dcs.codec == 'BIT7') then
-    data, len = Gsm7Encode(msg, 0)
-  else
-    data, len = msg, #msg
+local function UDEncode(msg, pdu, dcs)
+  local udh, udhl
+  if pdu.udh then
+    udh = UDHEncode(pdu.udh)
+    udhl = bit.rshift(#udh, 1)
   end
 
-  return string.format("%.2X", len) .. bin2hex(data)
+  local len, data
+  if (not dcs) or (not dcs.codec) or (dcs.codec == 'BIT7') then
+    local align
+    if udh then align = 7 - udhl % 7 end
+    data, len = Gsm7Encode(msg, nil, align)
+    if udh then len = len + (udhl * 8 + align) / 7 end
+  else
+    data, len = msg, #msg
+    if udh then len = len + udhl end
+  end
+
+  return string.format("%.2X", len) .. (udh or '') .. bin2hex(data)
 end
 
 ---
@@ -854,7 +865,7 @@ local function PDUEncoder(msg)
   end
 
   if mti == 'SUBMIT' or mti == 'DELIVER' then
-    res[#res + 1] = UDEncode(msg.ud, msg.dcs)
+    res[#res + 1] = UDEncode(msg.ud, msg, msg.dcs)
   end
 
   local pdu = table.concat(res)

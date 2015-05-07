@@ -196,4 +196,23 @@ end)
 
 end
 
+local _ENV = TEST_CASE'Encode SMS' if ENABLE then
+
+local it = IT(_ENV or _M)
+
+it('should deduce vp and udhi flags', function()
+  local pdu = {
+    ud   = 'Hello world',
+    addr = '+123456',
+    udh  = {
+      {iei=0, cnt=2, no=1, ref=204}
+    },
+    vp   = 10080,
+  }
+  local enc = '00510006912143650000AD12050003CC0201906536FB0DBABFE56C32'
+  assert_equal(enc, tpdu.Encode(pdu, 'input'))
+end)
+
+end
+
 RUN()

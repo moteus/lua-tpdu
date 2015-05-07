@@ -320,13 +320,18 @@ local function PDUTypeEncode(tp, pdu)
     end
   end
 
+  local udhi = tp.udhi
+  if nil == udhi then
+    udhi = not not pdu.udh
+  end
+
   v = SetBits(v, 0, m)
 
   if mti == 'SUBMIT' then
     v = SetBits(v, 2, tp.rd,   0)
     v = SetBits(v, 3, vpf,     0)
     v = SetBits(v, 5, tp.srr,  0)
-    v = SetBits(v, 6, tp.udhi, 0)
+    v = SetBits(v, 6, udhi,    0)
     v = SetBits(v, 7, tp.rp,   0)
   end
 

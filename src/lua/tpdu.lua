@@ -56,7 +56,7 @@ local TON = { -- TYPEOFNUMBER
   ALPHANUMERIC   = 5,
   ABBREVIATED    = 6,
   RESERVED       = 7
-};
+}
 
 local NPI = { -- NUMBERINGPLANIDENTIFICATION
   UNKNOWN    = 0,
@@ -635,7 +635,7 @@ local function VPEncode(v, pdu)
 end
 
 local IE_Decode = {
-  [0] = function(iter)
+  [0x00] = function(iter)
     local len = iter:read_byte()
     assert(len == 3)
     local ied = iter:peek_char(len*2)
@@ -645,7 +645,7 @@ local IE_Decode = {
     return { iei = 0, ied = hex2bin(ied), cnt = cnt, ref = ref, no = no }
   end;
 
-  [8] = function(iter)
+  [0x08] = function(iter)
     local len = iter:read_byte()
     assert(len == 4)
     local ied  = iter:peek_char(len*2)
@@ -658,10 +658,22 @@ local IE_Decode = {
 }
 
 local IE_Encode = {
-  [0] = function(t)
-    return string.format("%.2X%.2X%.2X%.2X%.2X",
-      0x00, 0x03, t.ref, t.cnt, t.no
-    )
+  [0x00] = function(t)
+    if t.ref and t.cnt and t.no then
+      return string.format("%.2X%.2X%.2X%.2X%.2X",
+        0x00, 0x03, t.ref, t.cnt, t.no
+      )
+    end
+  end;
+
+  [0x08] = function(t)
+    if t.ref and t.cnt and t.no then
+      local ref1 = bit.band(0xFF, bit.rshift(t.ref, 8))
+      local ref2 = bit.band(0xFF, t.ref)
+      return string.format("%.2X%.2X%.2X%.2X%.2X%.2X",
+        0x08, 0x04, ref1, ref2, t.cnt, t.no
+      )
+    end
   end;
 }
 
@@ -688,15 +700,20 @@ end
 local function UDHEncode(udh)
   local r = ''
 
-  for _, t in ipairs(udh) do
-    local enc = IE_Encode[t.iei]
-    if enc then r = r .. enc(t)
-    else
-      r = r .. string.format(
-        '%.2X%.2X%s',
-        t.iei, #t.ied, bin2hex(t.ied)
-      )
+  if type(udh) == 'table' then
+    for _, t in ipairs(udh) do
+      local enc = IE_Encode[t.iei]
+      if enc then enc = enc(t) end
+      if not enc then
+        enc = string.format(
+          '%.2X%.2X%s',
+          t.iei, #t.ied, bin2hex(t.ied)
+        )
+      end
+      r = r .. enc
     end
+  else
+    r = bin2hex(udh)
   end
 
   return string.format("%.2X%s",

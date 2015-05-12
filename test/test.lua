@@ -142,6 +142,18 @@ it('SMS-SUBMIT with alphanumeric numbers', function()
   assert_equal(pdu, tpdu.Encode(ms))
 end)
 
+it('SMS-SUBMIT with udh concat 8bit', function()
+  local pdu = '00410006A1214365000012050003170301906536FB0DBABFE56C32'
+  local ms = tpdu.Decode(pdu)
+  assert_equal(pdu, tpdu.Encode(ms))
+end)
+
+it('SMS-SUBMIT with udh concat 16bit', function()
+  local pdu = '00410006A121436500001406080401800402C8329BFD06DDDF723619'
+  local ms = tpdu.Decode(pdu)
+  assert_equal(pdu, tpdu.Encode(ms))
+end)
+
 end
 
 local _ENV = TEST_CASE'Timestamp tests' if ENABLE then
@@ -239,6 +251,32 @@ it('should encode alphanumeric numbers', function()
   }
 
   local enc = '0BD0CDFCB43D1F3BDBE2B21C01000DD0CDBCB32D2ECB0100000BC8329BFD06DDDF723619'
+  assert_equal(enc, tpdu.Encode(pdu, 'output'))
+end)
+
+it('should encode udh concat 8bit', function()
+  local pdu = {
+    addr = '123456',
+    ud   = 'Hello world',
+    udh  = {
+      {iei = 0, ref = 23, cnt = 3, no = 1}
+    }
+  }
+
+  local enc = '00410006A1214365000012050003170301906536FB0DBABFE56C32'
+  assert_equal(enc, tpdu.Encode(pdu, 'output'))
+end)
+
+it('should encode udh concat 16bit', function()
+  local pdu = {
+    addr = '123456',
+    ud   = 'Hello world',
+    udh  = {
+      {iei = 8, ref = 384, cnt = 4, no = 2}
+    }
+  }
+
+  local enc = '00410006A121436500001406080401800402C8329BFD06DDDF723619'
   assert_equal(enc, tpdu.Encode(pdu, 'output'))
 end)
 

@@ -36,6 +36,15 @@ function Iter:read_byte()
   return tonumber(self:read_char(2), 16)
 end
 
+function Iter:read_str(n)
+  local str = self:read_char(n*2)
+  str = str:gsub("(..)", function(ch)
+    local a = tonumber(ch, 16)
+    return string.char(a)
+  end)
+  return str
+end
+
 end
 
 local TON = { -- TYPEOFNUMBER
@@ -168,6 +177,7 @@ STInfo = function(status)
     success   = false,
     temporary = false,
     recovered = false,
+    info      = nil,
   }
 
   res.info = find_status(ST_SUCCESS, status)
@@ -211,7 +221,7 @@ local function SCADecode(iter)
   }
 
   if sca.ton == 'ALPHANUMERIC' then
-    smsc.number = Gsm7Decode(smsc.number)
+    sca.number = Gsm7Decode(sca.number)
   else
     sca.number = BcdDecode(sca.number)
     if sca.ton == 'INTERNTIONAL' then
@@ -444,30 +454,30 @@ local function DCSDecode(iter)
       local typ = GetBits(v, 4, 2)
       compressed = false
       if typ == 3 then
-        group = 'DATA'
         local reserved = GetBits(v, 3) == 1
-        assert(not reserved)
+        if reserved then return nil, string.format('invalid DCS byte: %.2X', v) end
+
+        group = 'DATA'
         codec = (GetBits(v, 2) == 0) and 'BIT7' or 'BIT8'
         class = GetBits(v, 0, 2)
       else
-        if typ == 0 then
-          group = 'DISCARD'
-          codec = 'BIT7'
-        elseif typ == 1 then
-          group = 'STORE'
-          codec = 'BIT7'
-        elseif typ == 2 then
-          group = 'STORE'
-          codec = 'UCS2'
-        end
         local reserved = GetBits(v, 2) == 1
-        assert(not reserved)
-        indication = 'NONE'
+        if reserved then return nil, string.format('invalid DCS byte: %.2X', v) end
+
+        if typ == 0 then     group, codec = 'DISCARD', 'BIT7'
+        elseif typ == 1 then group, codec = 'STORE',   'BIT7'
+        elseif typ == 2 then group, codec = 'STORE',   'UCS2'
+        end
+
         if GetBits(v, 3) == 1 then
           indication = GetBits(v, 0, 2)
+        else
+          indication = 'NONE'
         end
       end
-    else error('reserved') end
+    else -- reserved
+      return nil, string.format('invalid DCS byte: %.2X', v)
+    end
   end
 
   return{
@@ -502,11 +512,10 @@ local function DCSEncode(dcs)
     local _, codec = find(DCS_CODEC, codec)
     v = SetBits(v, 2, codec)
   else
-    if group == 'DATA' then
-      v = 0xFF
-      if codec == 'BIT8' then
-        v = SetBits(v, 2, 1)
-      end
+    if group == 'DATA' then -- group = 1100 0000 typ = 0011 0000
+      v = 0xF0
+      if codec == 'BIT8' then v = SetBits(v, 2, 1)     end
+      if class ~= 'NONE' then v = SetBits(v, 0, class) end
     else
       if   group == 'DISCARD' and codec == 'BIT7' then
         v = 0xC0
@@ -537,9 +546,12 @@ local function TSDecode(iter)
 
   tz = tonumber(tz, 16)
   local sign_tz = bit.band(tz, 0x80) == 0
-  tz = tonumber(string.format('%.2X', bit.band(tz, 0x7F)))
-  tz = tz / 4
-  if not sign_tz then tz = -tz end
+  tz = bit.band(tz, 0x7F)
+  tz = tonumber(string.format('%.2X', tz))
+  if tz then
+    tz = tz / 4
+    if not sign_tz then tz = -tz end
+  end
 
   return {
     year  = tonumber(Y);
@@ -595,7 +607,7 @@ local function VPDecode(iter, pdu)
     return TSDecode(iter)
   end
 
-  error('Reserved format')
+  return nil, string.format('invalid VP format: %.2d', pdu.vpf)
 end
 
 local function VPEncode(v, pdu)
@@ -626,20 +638,22 @@ local IE_Decode = {
   [0] = function(iter)
     local len = iter:read_byte()
     assert(len == 3)
+    local ied = iter:peek_char(len*2)
     local ref = iter:read_byte()
     local cnt = iter:read_byte()
     local no  = iter:read_byte()
-    return { iei = 0, cnt = cnt, ref = ref, no = no }
+    return { iei = 0, ied = hex2bin(ied), cnt = cnt, ref = ref, no = no }
   end;
 
   [8] = function(iter)
     local len = iter:read_byte()
     assert(len == 4)
+    local ied  = iter:peek_char(len*2)
     local ref1 = iter:read_byte()
     local ref2 = iter:read_byte()
-    local cnt = iter:read_byte()
-    local no  = iter:read_byte()
-    return { iei = 8, cnt = cnt, ref = bit.lshift(ref1,8) + ref2, no = no}
+    local cnt  = iter:read_byte()
+    local no   = iter:read_byte()
+    return { iei = 8, ied = hex2bin(ied), cnt = cnt, ref = bit.lshift(ref1,8) + ref2, no = no}
   end;
 }
 
@@ -676,7 +690,13 @@ local function UDHEncode(udh)
 
   for _, t in ipairs(udh) do
     local enc = IE_Encode[t.iei]
-    if enc then r = r .. enc(t) end
+    if enc then r = r .. enc(t)
+    else
+      r = r .. string.format(
+        '%.2X%.2X%s',
+        t.iei, #t.ied, bin2hex(t.ied)
+      )
+    end
   end
 
   return string.format("%.2X%s",
@@ -758,50 +778,62 @@ end
 
 local function PDUDecoder(pdu, direct)
   local iter = Iter.new(pdu)
-  local sca  = SCADecode(iter)
-  local tp   = PDUTypeDecode(iter, direct)
+  local sca, err  = SCADecode(iter)
+  if not sca then return nil, err end
+
+  local tp, err   = PDUTypeDecode(iter, direct)
+  if not tp then return nil, err end
 
   local mr
   if tp.mti == 'SUBMIT' or tp.mti == 'STATUS' then
     mr = iter:read_byte()
+    if not mr then return nil, 'invalid PDU length' end
   end
 
-  local addr = AddressDecode(iter)
+  local addr, err = AddressDecode(iter)
+  if not addr then return nil, err end
 
   local pid
   if tp.mti == 'SUBMIT' or tp.mti == 'DELIVER' then
     pid = iter:read_byte()
+    if not pid then return nil, 'invalid PDU length' end
   end
 
   local dcs
   if tp.mti == 'SUBMIT' or tp.mti == 'DELIVER' then
-    dcs = DCSDecode(iter)
+    dcs, err = DCSDecode(iter)
+    if not dcs then return nil, err end
   end
 
   local scts
   if tp.mti == 'STATUS' or tp.mti == 'DELIVER' then
-    scts = TSDecode(iter)
+    scts, err = TSDecode(iter)
+    if not scts then return nil, err end
   end
 
   local dts
   if tp.mti == 'STATUS' then
-    dts = TSDecode(iter)
+    dts, err = TSDecode(iter)
+    if not dts then return nil, err end
   end
 
   local status
   if tp.mti == 'STATUS' then
     status = iter:read_byte()
+    if not status then return nil, 'invalid PDU length' end
     status = STInfo(status)
   end
 
   local vp
   if tp.mti == 'SUBMIT' then
-    vp = VPDecode(iter, tp)
+    vp, err = VPDecode(iter, tp)
+    if not vp and err then return nil, err end
   end
 
   local ud, udh
   if tp.mti == 'SUBMIT' or tp.mti == 'DELIVER' then
     ud, udh = UDDecode(iter, tp, dcs)
+    if not ud then return nil, udh end
   end
 
   local msg = {
@@ -846,7 +878,7 @@ local function PDUEncoder(msg)
   end
 
   if mti == 'SUBMIT' or mti == 'DELIVER' then
-    res[#res + 1] = DCSEncode(msg.dcs)
+    res[#res + 1] = DCSEncode(dcs)
   end
 
   if mti == 'STATUS' or mti == 'DELIVER' then

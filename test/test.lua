@@ -136,6 +136,12 @@ it('SMS-DELIVER unknown udh', function()
   assert_equal(pdu, tpdu.Encode(ms))
 end)
 
+it('SMS-SUBMIT with alphanumeric numbers', function()
+  local pdu = '0BD0CDFCB43D1F3BDBE2B21C01000DD0CDBCB32D2ECB0100000BC8329BFD06DDDF723619'
+  local ms = tpdu.Decode(pdu)
+  assert_equal(pdu, tpdu.Encode(ms))
+end)
+
 end
 
 local _ENV = TEST_CASE'Timestamp tests' if ENABLE then
@@ -216,6 +222,23 @@ it('should deduce vp and udhi flags', function()
     vp   = 10080,
   }
   local enc = '00510006912143650000AD12050003CC0201906536FB0DBABFE56C32'
+  assert_equal(enc, tpdu.Encode(pdu, 'output'))
+end)
+
+it('should encode alphanumeric numbers', function()
+  local pdu = {
+    sc   = {
+      number = 'MySmscNmber',
+      npi   = 'UNKNOWN', ton = 'ALPHANUMERIC'
+    },
+    addr = {
+      number = 'MyNmber',
+      npi   = 'UNKNOWN', ton = 'ALPHANUMERIC'
+    },
+    ud   = 'Hello world',
+  }
+
+  local enc = '0BD0CDFCB43D1F3BDBE2B21C01000DD0CDBCB32D2ECB0100000BC8329BFD06DDDF723619'
   assert_equal(enc, tpdu.Encode(pdu, 'output'))
 end)
 

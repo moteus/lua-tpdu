@@ -66,7 +66,7 @@ local NPI = { -- NUMBERINGPLANIDENTIFICATION
   NATIONAL   = 8,
   PRIVATE    = 9,
   ERMES      = 10,
-  RESERVED   = 15
+  RESERVED   = 15,
 }
 
 local MTI = { -- message type id 
@@ -86,20 +86,20 @@ local SMS_CLASS = {
   CLASS_0,
   CLASS_1,
   CLASS_2,
-  CLASS_3
-};
+  CLASS_3,
+}
 
 local DCS_CODEC = {
   BIT7     = 0,
   BIT8     = 1,
   UCS2     = 2,
-  RESERVED = 3
-};
+  RESERVED = 3,
+}
 
 local DCS_GROUP = {
   DCS_GROUP_0,
-  DCS_GROUP_6
-};
+  DCS_GROUP_6,
+}
 
 local function find(t, val)
   for k, v in pairs(t) do
@@ -221,7 +221,7 @@ local function SCADecode(iter)
   }
 
   if sca.ton == 'ALPHANUMERIC' then
-    sca.number = Gsm7Decode(sca.number)
+    sca.number = Gsm7Decode(hex2bin(sca.number))
   else
     sca.number = BcdDecode(sca.number)
     if sca.ton == 'INTERNTIONAL' then
@@ -271,7 +271,7 @@ local function SCAEncode(sca)
     number = BcdEncode(number)
   end
 
-  local len = math.ceil(#number / 2) + 1
+  local len = bit.rshift(#number, 1) + 1
   return string.format("%.2X%.2X%s", len, toa, number)
 end
 

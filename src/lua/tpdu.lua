@@ -3,6 +3,7 @@ local Bit7  = require "tpdu.bit7"
 local Bcd   = require "tpdu.bcd"
 local bit   = utils.bit
 
+local Bit7Encode, Bit7Decode = Bit7.Encode, Bit7.Decode
 local Gsm7Encode, Gsm7Decode = Bit7.GsmEncode, Bit7.GsmDecode
 local BcdDecode, BcdEncode = Bcd.Decode, Bcd.Encode
 
@@ -737,15 +738,18 @@ local function UDDecode(iter, pdu, dcs)
     if udhl then
       bytes = bytes - udhl
       align = 7 - (udhl + 1) % 7
+      len   = len - math.ceil((udhl + 1) * 8 / 7)
     end
+
     data = iter:read_char(bytes * 2)
-    data = Gsm7Decode(hex2bin(data), align)
+    data = Bit7Decode(hex2bin(data), align)
   else
     if udhl then len = len - udhl end
     data = iter:read_char(len * 2)
     data = hex2bin(data)
   end
 
+  data = data:sub(1, len)
   return data, udh
 end
 
@@ -760,7 +764,7 @@ local function UDEncode(msg, pdu, dcs)
   if (not dcs) or (not dcs.codec) or (dcs.codec == 'BIT7') then
     local align
     if udh then align = 7 - udhl % 7 end
-    data, len = Gsm7Encode(msg, nil, align)
+    data, len = Bit7Encode(msg, nil, align)
     if udh then len = len + (udhl * 8 + align) / 7 end
   else
     data, len = msg, #msg

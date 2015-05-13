@@ -186,4 +186,6 @@ return {
   Decode    = Bit7Decode;
   GsmEncode = Gsm7Encode;
   GsmDecode = Gsm7Decode;
+  Asci2Gsm  = Asci2Gsm;
+  Gsm2Asci  = Gsm2Asci;
 }

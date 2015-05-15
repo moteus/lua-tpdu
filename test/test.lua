@@ -288,4 +288,19 @@ end)
 
 end
 
+local _ENV = TEST_CASE'DCS Broadcast encode' if ENABLE then
+
+local it = IT(_ENV or _M)
+
+it('circle', function()
+  for i = 0, 255 do
+    local t = tpdu._DCSBroadcastDecode(i)
+    if t then
+      assert_equal(i, tpdu._DCSBroadcastEncode(t))
+    end
+  end
+end)
+
+end
+
 RUN()

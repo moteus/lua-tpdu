@@ -544,12 +544,10 @@ local function DCSBroadcastDecode(v)
     -- Language using the default alphabet
     -- Unspecified handling at the MS
     lang  = GetBits(v, 0, 4)
-    codec = 'UCS2'
   elseif group <= 4 then
     -- Reserved for European Languages using the default alphabet,
     -- with unspecified handling at the MS
     lang = GetBits(v, 0, 4)
-    codec = 'UCS2'
   elseif group <= 14 then
     return nil, string.format('reserved coding groups: %.2X', v)
   else
@@ -568,14 +566,25 @@ local function DCSBroadcastDecode(v)
 end
 
 local function DCSBroadcastEncode(t)
-  local v = bit.band(0xF0, bit.lshift(t.group or 0, 4))
+  local group = t.group
 
-  if (t.group or 0) <= 4 or not t.group then
+  if not group then
+    if t.codec or t.class then group = 15 else group = 0 end
+  end
+
+  local v = bit.band(0xF0, bit.lshift(group, 4))
+
+  if group <= 4 then
     v = bit.bor(v, bit.band(0x0F, t.lang or 0x0F))
-  elseif t.group <= 14 then
+  elseif group <= 14 then
     return nil, string.format('reserved coding groups: %.2X', v)
   else
-    if t.codec == 'BIT8' then v = bit.bor(v, 0x04) end
+    if t.codec then
+      if t.codec == 'BIT8' then v = bit.bor(v, 0x04)
+      elseif t.codec ~= 'BIT7' then
+        return nil, string.format('Invalid codec: %s', tostring(t.codec))
+      end
+    end
     if t.class then v = bit.bor(v, bit.band(0x03, t.class)) end
   end
 

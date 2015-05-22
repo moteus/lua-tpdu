@@ -996,4 +996,6 @@ return {
 
   _DCSBroadcastDecode = DCSBroadcastDecode;
   _DCSBroadcastEncode = DCSBroadcastEncode;
+
+  _DecodeStatus = STInfo;
 }

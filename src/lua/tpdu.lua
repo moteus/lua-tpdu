@@ -13,9 +13,16 @@ local GetBits, SetBits = utils.GetBits, utils.SetBits
 local Iter = utils.class() do
 
 function Iter:__init(s)
+  assert(type(s) == "string")
+
   self._s = s
   self._i = 1
   return self
+end
+
+function Iter:rest()
+  if self._i > #self._s then return 0 end
+  return #self._s - self._i + 1
 end
 
 function Iter:peek_char(n)
@@ -852,10 +859,23 @@ end
 -- SCA PDU-Type(MTI) PI SCTS PID DCS UDL UD
 --
 
-local function PDUDecoder(pdu, direct)
+local function PDUDecoder(pdu, direct, len)
+
+  if pdu:find("%X") then
+    return nil, 'invalid PDU format'
+  end
+
   local iter = Iter.new(pdu)
+  if math.mod(iter:rest(), 2) ~= 0 then
+    return nil, 'invalid PDU length'
+  end
+
   local sca, err  = SCADecode(iter)
   if not sca then return nil, err end
+
+  if len and (len * 2) ~= iter:rest() then
+    return nil, 'invalid PDU length'
+  end
 
   local tp, err   = PDUTypeDecode(iter, direct)
   if not tp then return nil, err end

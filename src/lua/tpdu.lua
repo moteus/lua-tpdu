@@ -384,7 +384,7 @@ local function AddressDecode(iter)
     local chars = math.ceil(len / 2) * 2
     local n = iter:read_char(chars)
     addr.number = Gsm7Decode(hex2bin(n))
-    local symbols = math.ceil(len * 4 / 8)
+    local symbols = math.floor(len * 4 / 7)
     addr.number = addr.number:sub(1, symbols)
   else
     local bytes = math.ceil(len/2) * 2
@@ -429,7 +429,7 @@ local function AddressEncode(addr)
 
   local number, len = addr.number
   if ton == TON.ALPHANUMERIC then
-    number = bin2hex(Gsm7Encode(number, 0))
+    number = bin2hex(Gsm7Encode(number))
     len = math.ceil((#addr.number * 7)/4)
   else
     if ton == TON.INTERNTIONAL then

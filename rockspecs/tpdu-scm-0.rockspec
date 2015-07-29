@@ -7,7 +7,7 @@ source = {
 }
 
 description = {
-  summary    = "Lua low-level binding to libuv",
+  summary    = "Lua low-level TPDU decoder",
   homepage   = "https://github.com/moteus/lua-tpdu",
   license    = "MIT/X11",
   maintainer = "Alexey Melnichuk",

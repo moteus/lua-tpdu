@@ -10,7 +10,7 @@
 --
 ------------------------------------------------------------------
 
-local bit    = require "bit32"
+local bit    = require "tpdu.bit"
 local string = require "string"
 local table  = require "table"
 local math   = require "math"

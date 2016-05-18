@@ -27,6 +27,7 @@ build = {
 
   modules = {
     ["tpdu"          ] = "src/lua/tpdu.lua",
+    ["tpdu.bit"      ] = "src/lua/tpdu/bit.lua",
     ["tpdu.bcd"      ] = "src/lua/tpdu/bcd.lua",
     ["tpdu.bit7"     ] = "src/lua/tpdu/bit7.lua",
     ["tpdu.utils"    ] = "src/lua/tpdu/utils.lua",

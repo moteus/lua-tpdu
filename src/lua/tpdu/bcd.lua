@@ -2,7 +2,7 @@ local math   = require 'math'
 local string = require 'string'
 
 local function BcdEncode(str)
-  if math.mod(#str, 2) == 1 then
+  if #str % 2 == 1 then
     str = str .. 'F'
   end
 
@@ -11,7 +11,7 @@ local function BcdEncode(str)
 end
 
 local function BcdDecode(str)
-  if math.mod(#str, 2) == 1 then
+  if #str % 2 == 1 then
     return nil, 'string lenght not even'
   end
 

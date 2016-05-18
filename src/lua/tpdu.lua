@@ -866,7 +866,7 @@ local function PDUDecoder(pdu, direct, len)
   end
 
   local iter = Iter.new(pdu)
-  if math.mod(iter:rest(), 2) ~= 0 then
+  if iter:rest() % 2 ~= 0 then
     return nil, 'invalid PDU length'
   end
 

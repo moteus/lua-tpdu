@@ -63,7 +63,7 @@ local function Bit7Encode(str, pad, align)
 
   if pad then
     -- escape padding byte
-    if math.mod(#str, 16) == 0 and str:find('\r$') then
+    if #str % 16 == 0 and str:find('\r$') then
       str = str .. '\r'
     end
   end
@@ -162,7 +162,7 @@ local function Bit7Decode(str, align)
   end
 
   if res[#res] == '\r'  then
-    local m = math.mod(#res, 8)
+    local m = #res % 8
     if m == 0 or m == 1  and res[#res-1] == '\r' then
       res[#res] = nil
     end

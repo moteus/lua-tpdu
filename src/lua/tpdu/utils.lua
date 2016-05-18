@@ -1,3 +1,15 @@
+------------------------------------------------------------------
+--
+--  Author: Alexey Melnichuk <alexeymelnichuck@gmail.com>
+--
+--  Copyright (C) 2015-2016 Alexey Melnichuk <alexeymelnichuck@gmail.com>
+--
+--  Licensed according to the included 'LICENSE' document
+--
+--  This file is part of lua-tpdu library.
+--
+------------------------------------------------------------------
+
 local bit    = require "bit32"
 local string = require "string"
 local table  = require "table"

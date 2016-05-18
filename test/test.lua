@@ -7,6 +7,13 @@ local Bit7           = require "tpdu.bit7"
 local Bcd            = require "tpdu.bcd"
 local ut             = require "tpdu.utils"
 
+print("------------------------------------")
+print("Module    name: " .. tpdu._NAME);
+print("Module version: " .. tpdu._VERSION);
+print("Lua    version: " .. (_G.jit and _G.jit.version or _G._VERSION))
+print("------------------------------------")
+print("")
+
 local utils          = require "utils"
 local TEST_CASE      = require "lunit".TEST_CASE
 

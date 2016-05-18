@@ -1,3 +1,15 @@
+------------------------------------------------------------------
+--
+--  Author: Alexey Melnichuk <alexeymelnichuck@gmail.com>
+--
+--  Copyright (C) 2015-2016 Alexey Melnichuk <alexeymelnichuck@gmail.com>
+--
+--  Licensed according to the included 'LICENSE' document
+--
+--  This file is part of lua-tpdu library.
+--
+------------------------------------------------------------------
+
 local utils = require "tpdu.utils"
 local Bit7  = require "tpdu.bit7"
 local Bcd   = require "tpdu.bcd"
@@ -1007,6 +1019,11 @@ local function PDUEncoder(msg)
 end
 
 return {
+  _NAME      = "tpdu";
+  _VERSION   = "0.1.0-dev";
+  _COPYRIGHT = "Copyright (C) 2015-2016 Alexey Melnichuk";
+  _LICENSE   = "MIT";
+
   Encode = PDUEncoder;
   Decode = PDUDecoder;
 

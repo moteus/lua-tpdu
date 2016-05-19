@@ -555,20 +555,128 @@ local function DCSEncode(dcs)
   return string.format('%.2X', v)
 end
 
+local LANG = {
+  -- 3GPP TS 23.038 V13.0.0 (2015-12)
+  [0] = { -- group 0
+    [1 ] = 'DE';
+    [2 ] = 'EN';
+    [3 ] = 'IT';
+    [4 ] = 'FR';
+    [5 ] = 'ES';
+    [6 ] = 'NL';
+    [7 ] = 'SV';
+    [8 ] = 'DA';
+    [9 ] = 'PT';
+    [10] = 'FI';
+    [11] = 'NN';
+    [12] = 'EL';
+    [13] = 'TR';
+    [14] = 'HU';
+    [15] = 'PL';
+  };
+  [2] = {
+    [1] = 'CS';
+    [2] = 'HE';
+    [3] = 'AR';
+    [4] = 'RU';
+    [5] = 'IS';
+  }
+}
+
+local LANG_INVERT = {
+  -- 3GPP TS 23.038 V13.0.0 (2015-12)
+  [0] = { -- group 0
+    ['DE'] = 1 ;
+    ['EN'] = 2 ;
+    ['IT'] = 3 ;
+    ['FR'] = 4 ;
+    ['ES'] = 5 ;
+    ['NL'] = 6 ;
+    ['SV'] = 7 ;
+    ['DA'] = 8 ;
+    ['PT'] = 9 ;
+    ['FI'] = 10;
+    ['NN'] = 11;
+    ['EL'] = 12;
+    ['TR'] = 13;
+    ['HU'] = 14;
+    ['PL'] = 15;
+  };
+  [2] = {
+    ['CS'] = 1;
+    ['HE'] = 2;
+    ['AR'] = 3;
+    ['RU'] = 4;
+    ['IS'] = 5;
+  }
+}
+
+local LANG_CODES = {
+  ['DE'] = 'German';
+  ['EN'] = 'English';
+  ['IT'] = 'Italian';
+  ['FR'] = 'French';
+  ['ES'] = 'Spanish';
+  ['NL'] = 'Dutch';
+  ['SV'] = 'Swedish';
+  ['DA'] = 'Danish';
+  ['PT'] = 'Portuguese';
+  ['FI'] = 'Finnish';
+  ['NN'] = 'Norwegian';
+  ['EL'] = 'Greek';
+  ['TR'] = 'Turkish';
+  ['HU'] = 'Hungarian';
+  ['PL'] = 'Polish';
+  ['CS'] = 'Czech';
+  ['HE'] = 'Hebrew';
+  ['AR'] = 'Arabic';
+  ['RU'] = 'Russian';
+  ['IS'] = 'Icelandic';
+}
+
+local CBC_DCS_CODEC = { [0] = 'BIT7', [1] = 'BIT8', [2] = 'UCS2' }
 local function DCSBroadcastDecode(v)
-  local group, lang, class, codec
+  local group, lang, class, codec, compressed, rsv
   group = GetBits(v, 4, 4)
 
-  if group == 0 then
-    -- Language using the default alphabet
-    -- Unspecified handling at the MS
-    lang  = GetBits(v, 0, 4)
+  if group == 1 then -- 3GPP TS 23.038 V13.0.0 (2015-12)
+    local bits = GetBits(v, 0, 4)
+    if bits > 1 then return nil, string.format('reserved codec value: %.2X', v) end
+    codec = (bits == 0) and 'BIT7' or 'UCS2'
+
+    -- GSM 7 bit default alphabet; message preceded by language indication. 
+    -- The first 3 characters of the message are a two-character representation of 
+    -- the language encoded according to ISO 639 [12], followed by a CR character.
+    -- The CR character is then followed by 90 characters of text. 
+
+    -- UCS2; message preceded by language indication
+    -- The message starts with a two GSM 7-bit default alphabet character 
+    -- representation of the language encoded according to ISO 639 [12]. 
+    -- This is padded to the octet boundary with two bits set to 0 and 
+    -- then followed by 40 characters of UCS2-encoded message.
+
   elseif group <= 4 then
-    -- Reserved for European Languages using the default alphabet,
-    -- with unspecified handling at the MS
     lang = GetBits(v, 0, 4)
-  elseif group <= 14 then
+  elseif group <= 7 then -- 01xx xxxx
+    compressed = GetBits(v, 5)
+    local reserved = GetBits(v, 4)
+    codec = CBC_DCS_CODEC[GetBits(v, 2, 2)]
+    if not codec then return nil, string.format('reserved codec value: %.2X', v) end
+    local bits = GetBits(v, 0, 2)
+    if reserved == 1 then class = bits else rsv = bits end
+  elseif group == 9 then
+    -- Message with User Data Header (UDH) structure:
+    class = GetBits(v, 0, 2)
+    codec = CBC_DCS_CODEC[GetBits(v, 2, 2)]
+    if not codec then return nil, string.format('reserved codec value: %.2X', v) end
+  elseif group <= 12 then
     return nil, string.format('reserved coding groups: %.2X', v)
+  elseif group == 13 then
+    -- I1 protocol message defined in 3GPP TS 24.294
+    return nil, 'unsupported: I1 protocol'
+  elseif group == 14 then
+    -- Defined by the WAP Forum [15]
+    return nil, 'unsupported: WAP protocol'
   else
     local reserved = GetBits(v, 3)
     if reserved ~= 0 then return nil, string.format('invalid DCS byte: %.2X', v) end
@@ -576,14 +684,24 @@ local function DCSBroadcastDecode(v)
     class = GetBits(v, 0, 2)
   end
 
+  local lang_code
+  if lang then
+    local t = LANG[group]
+    if t then lang_code = t[lang] end
+  end
+
   return{
-    lang  = lang;
-    group = group;
-    class = class;
-    codec = codec;
+    lang       = lang;
+    lang_code  = lang_code;
+    group      = group;
+    class      = class;
+    codec      = codec;
+    compressed = compressed;
+    reserved   = rsv;
   }
 end
 
+local CBC_DCS_CODEC = { ['BIT7'] = 0, ['BIT8'] = 4, ['UCS2'] = 8 }
 local function DCSBroadcastEncode(t)
   local group = t.group
 
@@ -593,8 +711,34 @@ local function DCSBroadcastEncode(t)
 
   local v = bit.band(0xF0, bit.lshift(group, 4))
 
-  if group <= 4 then
-    v = bit.bor(v, bit.band(0x0F, t.lang or 0x0F))
+  if group == 1 then
+    local codec
+    if (not t.codec) or (t.codec == 'BIT7') then
+      codec = 0
+    elseif t.codec == 'UCS2' then
+      codec = 1
+    else
+      return nil, string.format('unknown codec: %s', tostring(t.codec))
+    end
+    v = bit.bor(v, bit.band(0x0F, codec))
+  elseif group <= 4 then
+    local lang = t.lang
+    if (not lang) and t.lang_code then
+      local l = LANG_INVERT[group]
+      if t then lang = l[t.lang_code] end
+    end
+    v = bit.bor(v, bit.band(0x0F, lang or 0x0F))
+  elseif group <= 7 then -- 01xx xxxx
+    local compressed = t.compressed == 1 and 0x20 or 0x00
+    local codec = CBC_DCS_CODEC[t.codec or 'BIT7']
+    if not codec then return nil, string.format('unknown codec value: %s', tostring(t.codec)) end
+    v = bit.bor(v, compressed, codec)
+    if t.class or t.reserved then v = bit.bor(v, bit.band(0x03, t.class or t.reserved)) end
+  elseif group == 9 then
+    local codec = CBC_DCS_CODEC[t.codec or 'BIT7']
+    if not codec then return nil, string.format('unknown codec value: %s', tostring(t.codec)) end
+    v = bit.bor(v, codec)
+    if t.class then v = bit.bor(v, bit.band(0x03, t.class)) end
   elseif group <= 14 then
     return nil, string.format('reserved coding groups: %.2X', v)
   else

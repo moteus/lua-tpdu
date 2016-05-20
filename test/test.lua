@@ -22,6 +22,10 @@ local RUN = utils.RUN
 local IT, CMD, PASS = utils.IT, utils.CMD, utils.PASS
 local nreturn, is_equal = utils.nreturn, utils.is_equal
 
+local function b(s)
+  return tonumber(s:gsub('[^01]', ''), 2)
+end
+
 local ENABLE = true
 
 local _ENV = TEST_CASE'7bit encoding' if ENABLE then
@@ -303,6 +307,198 @@ it('circle', function()
       assert_equal(i, tpdu._DCSBroadcastEncode(t))
     end
   end
+end)
+
+it('should process groups 0000,0010,0011', function()
+  local value = b'0000 1011'
+  local t = assert(tpdu._DCSBroadcastDecode(value))
+  assert_equal( 0,      t.group)
+  assert_nil  (         t.class)
+  assert_equal( 'EL',   t.lang_code)
+  assert_equal(b'1011', t.lang)
+  assert_equal( 'BIT7', t.codec)
+  assert_nil  (         t.compressed)
+
+  -- Support encode using language code
+  assert_equal(value, tpdu._DCSBroadcastEncode{group = 0; codec = 'BIT7'; lang_code = 'EL'})
+
+  local value = b'0010 0011'
+  local t = assert(tpdu._DCSBroadcastDecode(value))
+  assert_equal( 2,      t.group)
+  assert_nil  (         t.class)
+  assert_equal( 'RU',   t.lang_code)
+  assert_equal(b'0011', t.lang)
+  assert_equal( 'BIT7', t.codec)
+  assert_nil  (         t.compressed)
+
+  -- Support encode using language code
+  assert_equal(value, tpdu._DCSBroadcastEncode{group = 2; lang_code = 'RU'})
+
+  -- Reserved language
+  local value = b'0000 1111'
+  local t = assert(tpdu._DCSBroadcastDecode(value))
+  assert_equal( 0,      t.group)
+  assert_nil  (         t.class)
+  assert_nil  (         t.lang_code)
+  assert_equal(b'1111', t.lang)
+  assert_equal( 'BIT7', t.codec)
+  assert_nil  (         t.compressed)
+
+  -- Support only BIT7
+  assert_nil(tpdu._DCSBroadcastEncode{group = 0; codec = 'UCS2'})
+end)
+
+it('should process group 0001', function()
+  local value = b'0001 0000'
+  local t = assert(tpdu._DCSBroadcastDecode(value))
+  assert_equal( 1,      t.group)
+  assert_nil  (         t.class)
+  assert_nil  (         t.lang_code)
+  assert_nil  (         t.lang)
+  assert_equal( 'BIT7', t.codec)
+  assert_nil  (         t.compressed)
+
+  local value = b'0001 0001'
+  local t = assert(tpdu._DCSBroadcastDecode(value))
+  assert_equal( 1,      t.group)
+  assert_nil  (         t.class)
+  assert_nil  (         t.lang_code)
+  assert_nil  (         t.lang)
+  assert_equal( 'UCS2', t.codec)
+  assert_nil  (         t.compressed)
+
+  -- Unsopported codec
+  assert_nil(tpdu._DCSBroadcastEncode{group = 1; codec = 'BIT8'})
+end)
+
+it('should process group 01XX', function()
+  local value = b'0100 0000'
+  local t = assert(tpdu._DCSBroadcastDecode(value))
+  assert_equal( 4,      t.group)
+  assert_nil  (         t.class)
+  assert_nil  (         t.lang_code)
+  assert_nil  (         t.lang)
+  assert_equal( 'BIT7', t.codec)
+  assert_false(         t.compressed)
+
+  local value = b'0100 0100'
+  local t = assert(tpdu._DCSBroadcastDecode(value))
+  assert_equal( 4,      t.group)
+  assert_nil  (         t.class)
+  assert_nil  (         t.lang_code)
+  assert_nil  (         t.lang)
+  assert_equal( 'BIT8', t.codec)
+  assert_false(         t.compressed)
+
+  local value = b'0100 1000'
+  local t = assert(tpdu._DCSBroadcastDecode(value))
+  assert_equal( 4,      t.group)
+  assert_nil  (         t.class)
+  assert_nil  (         t.lang_code)
+  assert_nil  (         t.lang)
+  assert_equal( 'UCS2', t.codec)
+  assert_false(         t.compressed)
+
+  -- Reserved codec value
+  local value = b'0100 1100'
+  assert_nil(tpdu._DCSBroadcastDecode(value))
+
+  local value = b'0101 0000'
+  local t = assert(tpdu._DCSBroadcastDecode(value))
+  assert_equal( 5,      t.group)
+  assert_equal( 0,      t.class)
+  assert_nil  (         t.lang_code)
+  assert_nil  (         t.lang)
+  assert_equal( 'BIT7', t.codec)
+  assert_false(         t.compressed)
+
+  local value = b'0101 0001'
+  local t = assert(tpdu._DCSBroadcastDecode(value))
+  assert_equal( 5,      t.group)
+  assert_equal( 1,      t.class)
+  assert_nil  (         t.lang_code)
+  assert_nil  (         t.lang)
+  assert_equal( 'BIT7', t.codec)
+  assert_false(         t.compressed)
+
+  local value = b'0101 0010'
+  local t = assert(tpdu._DCSBroadcastDecode(value))
+  assert_equal( 5,      t.group)
+  assert_equal( 2,      t.class)
+  assert_nil  (         t.lang_code)
+  assert_nil  (         t.lang)
+  assert_equal( 'BIT7', t.codec)
+  assert_false(         t.compressed)
+
+  local value = b'0101 0011'
+  local t = assert(tpdu._DCSBroadcastDecode(value))
+  assert_equal( 5,      t.group)
+  assert_equal( 3,      t.class)
+  assert_nil  (         t.lang_code)
+  assert_nil  (         t.lang)
+  assert_equal( 'BIT7', t.codec)
+  assert_false(         t.compressed)
+
+  local value = b'0110 0000'
+  local t = assert(tpdu._DCSBroadcastDecode(value))
+  assert_equal( 6,      t.group)
+  assert_nil  (         t.class)
+  assert_nil  (         t.lang_code)
+  assert_nil  (         t.lang)
+  assert_equal( 'BIT7', t.codec)
+  assert_true (         t.compressed)
+end)
+
+it('should process group 1001', function()
+  local value = b'1001 0110'
+  local t = assert(tpdu._DCSBroadcastDecode(value))
+  assert_equal( 9,      t.group)
+  assert_equal( 2,      t.class)
+  assert_nil  (         t.lang_code)
+  assert_nil  (         t.lang)
+  assert_equal( 'BIT8', t.codec)
+  assert_nil  (         t.compressed)
+end)
+
+it('should process group 1111', function()
+  local value = b'1111 0000'
+  local t = assert(tpdu._DCSBroadcastDecode(value))
+  assert_equal( 15,     t.group)
+  assert_equal( 0,      t.class)
+  assert_nil  (         t.lang_code)
+  assert_nil  (         t.lang)
+  assert_equal( 'BIT7', t.codec)
+  assert_nil  (         t.compressed)
+
+  -- Reserved bit
+  local value = b'1111 1000'
+  assert_nil(tpdu._DCSBroadcastDecode(value))
+
+  local value = b'1111 0011'
+  local t = assert(tpdu._DCSBroadcastDecode(value))
+  assert_equal( 15,     t.group)
+  assert_equal( 3,      t.class)
+  assert_nil  (         t.lang_code)
+  assert_nil  (         t.lang)
+  assert_equal( 'BIT7', t.codec)
+  assert_nil  (         t.compressed)
+
+  local value = b'1111 0110'
+  local t = assert(tpdu._DCSBroadcastDecode(value))
+  assert_equal( 15,     t.group)
+  assert_equal( 2,      t.class)
+  assert_nil  (         t.lang_code)
+  assert_nil  (         t.lang)
+  assert_equal( 'BIT8', t.codec)
+  assert_nil  (         t.compressed)
+end)
+
+it('should process reserved groups', function()
+  assert_nil(tpdu._DCSBroadcastDecode(b'1000 0000'))
+  assert_nil(tpdu._DCSBroadcastDecode(b'1010 0000'))
+  assert_nil(tpdu._DCSBroadcastDecode(b'1011 0000'))
+  assert_nil(tpdu._DCSBroadcastDecode(b'1101 0000'))
+  assert_nil(tpdu._DCSBroadcastDecode(b'1110 0000'))
 end)
 
 end

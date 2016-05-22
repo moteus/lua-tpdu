@@ -21,6 +21,9 @@ local BcdDecode, BcdEncode = Bcd.Decode, Bcd.Encode
 
 local hex2bin, bin2hex = utils.hex2bin, utils.bin2hex
 local GetBits, SetBits = utils.GetBits, utils.SetBits
+local ferror = function(...)
+  return utils.error(string.format(...))
+end
 
 local Iter = utils.class() do
 
@@ -475,14 +478,14 @@ local function DCSDecode(iter)
       compressed = false
       if typ == 3 then
         local reserved = GetBits(v, 3) == 1
-        if reserved then return nil, string.format('invalid DCS byte: %.2X', v) end
+        if reserved then return nil, ferror('invalid DCS byte: %.2X', v) end
 
         group = 'DATA'
         codec = (GetBits(v, 2) == 0) and 'BIT7' or 'BIT8'
         class = GetBits(v, 0, 2)
       else
         local reserved = GetBits(v, 2) == 1
-        if reserved then return nil, string.format('invalid DCS byte: %.2X', v) end
+        if reserved then return nil, ferror('invalid DCS byte: %.2X', v) end
 
         if typ == 0 then     group, codec = 'DISCARD', 'BIT7'
         elseif typ == 1 then group, codec = 'STORE',   'BIT7'
@@ -496,7 +499,7 @@ local function DCSDecode(iter)
         end
       end
     else -- reserved
-      return nil, string.format('invalid DCS byte: %.2X', v)
+      return nil, ferror('invalid DCS byte: %.2X', v)
     end
   end
 
@@ -641,7 +644,7 @@ local function DCSBroadcastDecode(v)
 
   if group == 1 then -- 3GPP TS 23.038 V13.0.0 (2015-12)
     local bits = GetBits(v, 0, 4)
-    if bits > 1 then return nil, string.format('reserved codec value: %.2X', v) end
+    if bits > 1 then return nil, ferror('reserved codec value: %.2X', v) end
     codec = (bits == 0) and 'BIT7' or 'UCS2'
 
     -- GSM 7 bit default alphabet; message preceded by language indication. 
@@ -662,25 +665,25 @@ local function DCSBroadcastDecode(v)
     compressed = GetBits(v, 5) == 1
     local reserved = GetBits(v, 4)
     codec = CBC_DCS_CODEC[GetBits(v, 2, 2)]
-    if not codec then return nil, string.format('reserved codec value: %.2X', v) end
+    if not codec then return nil, ferror('reserved codec value: %.2X', v) end
     local bits = GetBits(v, 0, 2)
     if reserved == 1 then class = bits else rsv = bits end
   elseif group == 9 then
     -- Message with User Data Header (UDH) structure:
     class = GetBits(v, 0, 2)
     codec = CBC_DCS_CODEC[GetBits(v, 2, 2)]
-    if not codec then return nil, string.format('reserved codec value: %.2X', v) end
+    if not codec then return nil, ferror('reserved codec value: %.2X', v) end
   elseif group <= 12 then
-    return nil, string.format('reserved coding groups: %.2X', v)
+    return nil, ferror('reserved coding groups: %.2X', v)
   elseif group == 13 then
     -- I1 protocol message defined in 3GPP TS 24.294
-    return nil, 'unsupported: I1 protocol'
+    return nil, ferror('unsupported: I1 protocol')
   elseif group == 14 then
     -- Defined by the WAP Forum [15]
-    return nil, 'unsupported: WAP protocol'
+    return nil, ferror('unsupported: WAP protocol')
   else
     local reserved = GetBits(v, 3)
-    if reserved ~= 0 then return nil, string.format('invalid DCS byte: %.2X', v) end
+    if reserved ~= 0 then return nil, ferror('invalid DCS byte: %.2X', v) end
     codec = GetBits(v, 2) == 0 and 'BIT7' or 'BIT8'
     class = GetBits(v, 0, 2)
   end
@@ -719,7 +722,7 @@ local function DCSBroadcastEncode(t)
     elseif t.codec == 'UCS2' then
       codec = 1
     else
-      return nil, string.format('unknown codec: %s', tostring(t.codec))
+      return nil, ferror('unknown codec: %s', tostring(t.codec))
     end
     v = bit.bor(v, bit.band(0x0F, codec))
   elseif group <= 3 then
@@ -729,27 +732,27 @@ local function DCSBroadcastEncode(t)
       if t then lang = l[t.lang_code] end
     end
     if t.codec and t.codec ~= 'BIT7' then
-      return nil, string.format('invalid codec value %s for group %d', tostring(t.codec), group)
+      return nil, ferror('invalid codec value %s for group %d', tostring(t.codec), group)
     end
     v = bit.bor(v, bit.band(0x0F, lang or 0x0F))
   elseif group <= 7 then -- 01xx xxxx
     local compressed = (t.compressed == true or t.compressed == 1) and 0x20 or 0x00
     local codec = CBC_DCS_CODEC[t.codec or 'BIT7']
-    if not codec then return nil, string.format('unknown codec value: %s', tostring(t.codec)) end
+    if not codec then return nil, ferror('unknown codec value: %s', tostring(t.codec)) end
     v = bit.bor(v, compressed, codec)
     if t.class or t.reserved then v = bit.bor(v, bit.band(0x03, t.class or t.reserved)) end
   elseif group == 9 then
     local codec = CBC_DCS_CODEC[t.codec or 'BIT7']
-    if not codec then return nil, string.format('unknown codec value: %s', tostring(t.codec)) end
+    if not codec then return nil, ferror('unknown codec value: %s', tostring(t.codec)) end
     v = bit.bor(v, codec)
     if t.class then v = bit.bor(v, bit.band(0x03, t.class)) end
   elseif group <= 14 then
-    return nil, string.format('reserved coding groups: %.2X', v)
+    return nil, ferror('reserved coding groups: %.2X', v)
   else
     if t.codec then
       if t.codec == 'BIT8' then v = bit.bor(v, 0x04)
       elseif t.codec ~= 'BIT7' then
-        return nil, string.format('Invalid codec: %s', tostring(t.codec))
+        return nil, ferror('Invalid codec: %s', tostring(t.codec))
       end
     end
     if t.class then v = bit.bor(v, bit.band(0x03, t.class)) end
@@ -830,7 +833,7 @@ local function VPDecode(iter, pdu)
     return TSDecode(iter)
   end
 
-  return nil, string.format('invalid VP format: %.2d', pdu.vpf)
+  return nil, ferror('invalid VP format: %.2d', pdu.vpf)
 end
 
 local function VPEncode(v, pdu)
@@ -1022,19 +1025,19 @@ end
 local function PDUDecoder(pdu, direct, len)
 
   if pdu:find("%X") then
-    return nil, 'invalid PDU format'
+    return nil, ferror('invalid PDU format')
   end
 
   local iter = Iter.new(pdu)
   if iter:rest() % 2 ~= 0 then
-    return nil, 'invalid PDU length'
+    return nil, ferror('invalid PDU length')
   end
 
   local sca, err  = SCADecode(iter)
   if not sca then return nil, err end
 
   if len and (len * 2) ~= iter:rest() then
-    return nil, 'invalid PDU length'
+    return nil, ferror('invalid PDU length')
   end
 
   local tp, err   = PDUTypeDecode(iter, direct)
@@ -1043,7 +1046,7 @@ local function PDUDecoder(pdu, direct, len)
   local mr
   if tp.mti == 'SUBMIT' or tp.mti == 'STATUS' then
     mr = iter:read_byte()
-    if not mr then return nil, 'invalid PDU length' end
+    if not mr then return nil, ferror('invalid PDU length') end
   end
 
   local addr, err = AddressDecode(iter)
@@ -1052,7 +1055,7 @@ local function PDUDecoder(pdu, direct, len)
   local pid
   if tp.mti == 'SUBMIT' or tp.mti == 'DELIVER' then
     pid = iter:read_byte()
-    if not pid then return nil, 'invalid PDU length' end
+    if not pid then return nil, ferror('invalid PDU length') end
   end
 
   local dcs
@@ -1076,7 +1079,7 @@ local function PDUDecoder(pdu, direct, len)
   local status
   if tp.mti == 'STATUS' then
     status = iter:read_byte()
-    if not status then return nil, 'invalid PDU length' end
+    if not status then return nil, ferror('invalid PDU length') end
     status = STInfo(status)
   end
 

@@ -73,6 +73,46 @@ local function class(base)
   return t
 end
 
+local PDUError = class() do
+
+local ERRORS = {
+  EFORMAT = -1;
+}
+
+function PDUError:__init(msg)
+  self._no   = ERRORS.EFORMAT
+  self._name = 'EFORMAT'
+  self._msg  = assert(msg)
+  self._ext  = ext
+  return self
+end
+
+function PDUError:cat()  return 'TPDU' end
+
+function PDUError:no()   return self._no    end
+
+function PDUError:name() return self._name end
+
+function PDUError:msg()  return self._msg end
+
+function PDUError:ext()  return self._ext   end
+
+function PDUError:__eq(rhs)
+  return (self._no == rhs._no) and (self._name == rhs._name)
+end
+
+function PDUError:__tostring()
+  local err = string.format("[%s][%s] %s (%d)",
+    self:cat(), self:name(), self:msg(), self:no()
+  )
+  if self:ext() then
+    err = string.format("%s - %s", err, self:ext())
+  end
+  return err
+end
+
+end
+
 return {
   bit     = bit;
   hex2bin = hex2bin;
@@ -80,4 +120,5 @@ return {
   GetBits = GetBits;
   SetBits = SetBits;
   class   = class;
+  error   = PDUError.new;
 }

@@ -523,8 +523,20 @@ it('SMS-DELIVER Too long', function()
 end)
 
 it('Invalid charset', function()
-  local pdu = 'ABCDEFGH'
+  local pdu = '07919761989901F0040B917777777777F70000515022114032210A31D98C56B3DD70391X'
   local ms = assert_nil(tpdu.Decode(pdu, 'input', 28))
+end)
+
+it('Error object', function()
+  local pdu = '07919761989901F0040B917777777777F70000515022114032210A31D98C56B3DD70391X'
+  local ms, err = assert_nil(tpdu.Decode(pdu, 'input', 28))
+  assert(err)
+  assert_equal('TPDU', err:cat())
+  assert_number(err:no())
+  assert_string(err:name())
+  assert_string(err:msg())
+  assert_not_nil(tostring(err):find(err:msg(), nil, true))
+  assert_not_nil(tostring(err):find('[TPDU]', nil, true))
 end)
 
 end

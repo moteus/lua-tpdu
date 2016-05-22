@@ -649,12 +649,12 @@ local function DCSBroadcastDecode(v)
 
     -- GSM 7 bit default alphabet; message preceded by language indication. 
     -- The first 3 characters of the message are a two-character representation of 
-    -- the language encoded according to ISO 639 [12], followed by a CR character.
+    -- the language encoded according to ISOÂ 639Â [12], followed by a CR character.
     -- The CR character is then followed by 90 characters of text. 
 
     -- UCS2; message preceded by language indication
     -- The message starts with a two GSM 7-bit default alphabet character 
-    -- representation of the language encoded according to ISO 639 [12]. 
+    -- representation of the language encoded according to ISOÂ 639Â [12]. 
     -- This is padded to the octet boundary with two bits set to 0 and 
     -- then followed by 40 characters of UCS2-encoded message.
 
@@ -676,7 +676,7 @@ local function DCSBroadcastDecode(v)
   elseif group <= 12 then
     return nil, ferror('reserved coding groups: %.2X', v)
   elseif group == 13 then
-    -- I1 protocol message defined in 3GPP TS 24.294
+    -- I1 protocol message defined in 3GPPÂ TSÂ 24.294
     return nil, ferror('unsupported: I1 protocol')
   elseif group == 14 then
     -- Defined by the WAP Forum [15]

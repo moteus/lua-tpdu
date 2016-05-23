@@ -1171,7 +1171,7 @@ end
 
 return {
   _NAME      = "tpdu";
-  _VERSION   = "0.1.0-dev";
+  _VERSION   = "0.1.0";
   _COPYRIGHT = "Copyright (C) 2015-2016 Alexey Melnichuk";
   _LICENSE   = "MIT";
 

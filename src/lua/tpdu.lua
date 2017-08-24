@@ -903,11 +903,11 @@ local IE_Encode = {
 
   [0x05] = function(t)
     if t.src and t.dst then
-      return string.format("%.2X%.2X%.2X%.2X",
-        bit.band(0xFF, bit.rshift(t.src, 8)),
-        bit.band(0xFF, t.src),
+      return string.format("%.2X%.2X%.2X%.2X%.2X%.2X", 0x05, 0x04,
         bit.band(0xFF, bit.rshift(t.dst, 8)),
-        bit.band(0xFF, t.dst)
+        bit.band(0xFF, t.dst),
+        bit.band(0xFF, bit.rshift(t.src, 8)),
+        bit.band(0xFF, t.src)
       )
     end
   end;

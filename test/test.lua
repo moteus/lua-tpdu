@@ -1,4 +1,4 @@
--- package.path = "..\\src\\lua\\?.lua;" .. package.path
+package.path = "..\\src\\lua\\?.lua;" .. package.path
 
 pcall(require, "luacov")
 
@@ -165,12 +165,20 @@ local tests = {
     'output'
   };
 }
+local known_iei = { [0] = true, [5] = true, [8] = true, }
 
 for _, T in ipairs(tests) do
 local name, pdu, direct = T[1], T[2], T[3]
 
 it(name, function()
   local msg = assert_table(tpdu.Decode(pdu, direct))
+  if msg.udh then
+    for _, ie in ipairs(msg.udh) do
+      if known_iei[ie.iei] then
+        ie.ied = nil
+      end
+    end
+  end
   assert_equal(pdu, tpdu.Encode(msg))
 end)
 

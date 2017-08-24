@@ -871,6 +871,15 @@ local IE_Decode = {
     return { iei = 0, ied = hex2bin(ied), cnt = cnt, ref = ref, no = no }
   end;
 
+  [0x05] = function(iter)
+    local len = iter:read_byte()
+    assert(len == 4)
+    local ied = iter:peek_char(len*2)
+    local dst = bit.lshift(iter:read_byte(), 8) + iter:read_byte()
+    local src = bit.lshift(iter:read_byte(), 8) + iter:read_byte()
+    return { iei = 5, ied = hex2bin(ied), src = src, dst = dst}
+  end;
+
   [0x08] = function(iter)
     local len = iter:read_byte()
     assert(len == 4)
@@ -888,6 +897,17 @@ local IE_Encode = {
     if t.ref and t.cnt and t.no then
       return string.format("%.2X%.2X%.2X%.2X%.2X",
         0x00, 0x03, t.ref, t.cnt, t.no
+      )
+    end
+  end;
+
+  [0x05] = function(t)
+    if t.src and t.dst then
+      return string.format("%.2X%.2X%.2X%.2X",
+        bit.band(0xFF, bit.rshift(t.src, 8)),
+        bit.band(0xFF, t.src),
+        bit.band(0xFF, bit.rshift(t.dst, 8)),
+        bit.band(0xFF, t.dst)
       )
     end
   end;
